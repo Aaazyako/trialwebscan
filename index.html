@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Login & QR Scanner</title>
+  <style>
+    body, html {
+      margin: 0; padding: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f5f5f5;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 800px;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    h2 { margin-top: 0; text-align: center; }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+
+    #scannerPage { display: none; flex-direction: column; align-items: center; width: 100%; }
+    header {
+      width: 100%; background: #007bff; color: white;
+      padding: 12px; text-align: center; font-weight: bold;
+    }
+    .video-container {
+      position: relative; width: 100%; max-width: 400px;
+      border-radius: 12px; overflow: hidden; margin-top: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    video { width: 100%; display: block; }
+    .scan-area {
+      position: absolute; top: 50%; left: 50%;
+      width: 70%; height: 50%;
+      border: 2px solid rgba(255,255,255,0.8);
+      border-radius: 8px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    #status { margin: 10px 0; }
+
+    #dashboard {
+      width: 100%; margin-top: 20px; background: white;
+      border-radius: 12px; padding: 15px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td {
+      padding: 10px; border-bottom: 1px solid #eee; text-align: left;
+    }
+    th { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Halaman Login -->
+    <div id="loginPage" class="card">
+      <h2>🔐 Login</h2>
+      <input type="text" id="username" placeholder="Username" />
+      <input type="password" id="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+      <div id="loginError" style="color:red; margin-top:10px; display:none;">❌ Username atau Password salah</div>
+    </div>
+
+    <!-- Halaman Scanner -->
+    <div id="scannerPage">
+      <header>📷 QR Scanner Dashboard</header>
+      <div style="margin-top:10px;">👤 Login sebagai: <b id="userInfo"></b></div>
+
+      <div class="video-container">
+        <video id="video" autoplay playsinline></video>
+        <div class="scan-area"></div>
+      </div>
+      <div id="status">Arahkan kamera ke QR Code...</div>
+
+      <div id="dashboard">
+        <h3>📋 Data Scan</h3>
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>Kode QR</th>
+              <th>Waktu Masuk</th>
+              <th>Waktu Selesai</th>
+              <th>Bagian</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="canvas" hidden></canvas>
+
+  <!-- jsQR -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <script>
+  // ==========================
+  // Data Akun Login
+  // ==========================
+  const users = {
+    "subframe12": { password: "1234", bagian: "SUBFRAME" },
+    "PTO34": { password: "1234", bagian: "PTO" },
+    "POTONGCHASIS56": { password: "1234", bagian: "POTONG CHASIS" }
+  };
+
+  let currentUser = null;
+
+  function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    if (users[username] && users[username].password === password) {
+      currentUser = { username, bagian: users[username].bagian };
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("scannerPage").style.display = "flex";
+      document.getElementById("userInfo").textContent = currentUser.username + " (" + currentUser.bagian + ")";
+      startScanner();
+    } else {
+      document.getElementById("loginError").style.display = "block";
+    }
+  }
+
+  // ==========================
+  // QR Scanner
+  // ==========================
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('status');
+  const tableBody = document.querySelector("#dataTable tbody");
+
+  let scanning = false;
+  const SCAN_DELAY = 60000; // 1 menit (ms)
+  const scanHistory = {};   // { qrCode: { lastScan: Date, row: HTMLTableRowElement } }
+
+  function startScanner() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true);
+        video.play();
+        scanning = true;
+        scanLoop();
+      })
+      .catch(() => {
+        statusEl.innerText = "❌ Kamera tidak bisa diakses";
+      });
+  }
+
+  function scanLoop() {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (code) {
+        handleScan(code.data);
+        scanning = false;
+        setTimeout(() => {
+          scanning = true;
+          scanLoop();
+        }, 1000); // tetap scan setiap 1 detik, validasi 1 menit ada di handleScan
+      }
+    }
+    requestAnimationFrame(scanLoop);
+  }
+
+  // ==========================
+  // Handle Data Scan
+  // ==========================
+  function handleScan(qrCode) {
+    const now = new Date();
+    const waktu = now.toLocaleString();
+
+    if (!scanHistory[qrCode]) {
+      // QR baru → buat baris baru
+      const row = document.createElement("tr");
+      const cellCode = document.createElement("td");
+      const cellMasuk = document.createElement("td");
+      const cellSelesai = document.createElement("td");
+      const cellBagian = document.createElement("td");
+
+      cellCode.textContent = qrCode;
+      cellMasuk.textContent = waktu;
+      cellSelesai.textContent = "-";
+      cellBagian.textContent = currentUser.bagian;
+
+      row.appendChild(cellCode);
+      row.appendChild(cellMasuk);
+      row.appendChild(cellSelesai);
+      row.appendChild(cellBagian);
+
+      tableBody.prepend(row);
+
+      // simpan history
+      scanHistory[qrCode] = { lastScan: now, row: row };
+
+      statusEl.innerText = "✅ QR baru: " + qrCode;
+    } else {
+      // QR lama → cek jeda waktu
+      const lastScanTime = scanHistory[qrCode].lastScan;
+      const diff = now - lastScanTime;
+
+      if (diff >= SCAN_DELAY) {
+        const row = scanHistory[qrCode].row;
+        const cellSelesai = row.cells[2];
+        cellSelesai.textContent = waktu; // update waktu selesai
+        scanHistory[qrCode].lastScan = now;
+
+        statusEl.innerText = "✅ QR selesai: " + qrCode;
+      } else {
+        statusEl.innerText = "⏳ QR sama terdeteksi, tunggu 1 menit untuk scan berikutnya";
+      }
+    }
+  }
+</script>
+</body>
+</html>
