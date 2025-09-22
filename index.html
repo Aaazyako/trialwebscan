@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Scanner Pro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      background: linear-gradient(135deg, #2b4369, #4b6cb7); /* Gradien biru tua profesional */
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+    }
+    .container {
+      width: 100%;
+      max-width: 900px; /* Lebar lebih besar untuk desktop */
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+    h2 {
+      margin: 0 0 20px;
+      text-align: center;
+      color: #1a2a44; /* Biru tua untuk teks */
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 12px 0;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      box-sizing: border-box;
+      background: #f9fafb;
+      font-size: 16px;
+      transition: border-color 0.3s ease;
+    }
+    input:focus {
+      outline: none;
+      border-color: #1a2a44;
+      box-shadow: 0 0 0 3px rgba(26, 42, 68, 0.1);
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      background: #1a2a44; /* Biru tua untuk tombol */
+      color: white;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    button:hover {
+      background: #15223b; /* Biru lebih gelap saat hover */
+    }
+    .logout-btn {
+      background: #dc3545; /* Merah untuk logout */
+      margin-top: 12px;
+    }
+    .logout-btn:hover {
+      background: #c82333;
+    }
+    #scannerPage {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    header {
+      width: 100%;
+      background: #1a2a44;
+      color: white;
+      padding: 16px;
+      text-align: center;
+      font-weight: 600;
+      border-radius: 16px 16px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    header img {
+      height: 32px;
+      filter: brightness(0) invert(1); /* Logo putih */
+    }
+    .video-container {
+      position: relative;
+      width: 100%;
+      max-width: 480px; /* Lebar video lebih besar */
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 24px 0;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+      background: #fff;
+    }
+    video {
+      width: 100%;
+      display: block;
+    }
+    .scan-area {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 80%;
+      height: 60%;
+      border: 3px solid rgba(255, 255, 255, 0.9);
+      border-radius: 12px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    #status {
+      margin: 12px 0;
+      text-align: center;
+      color: #1a2a44;
+      font-weight: 500;
+      font-size: 16px;
+    }
+    #dashboard {
+      width: 100%;
+      margin-top: 24px;
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      background: #f9fafb;
+    }
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      color: #1a2a44;
+    }
+    th {
+      background: #e5e7eb; /* Abu-abu terang untuk header tabel */
+      font-weight: 600;
+    }
+    /* Media Queries untuk Responsivitas */
+    @media (max-width: 600px) {
+      .container { padding: 16px; }
+      .card { padding: 20px; }
+      .video-container { max-width: 100%; }
+      table { font-size: 12px; }
+      th, td { padding: 10px; }
+      header { font-size: 14px; padding: 12px; }
+      header img { height: 24px; }
+      button { padding: 12px; font-size: 14px; }
+    }
+    @media (min-width: 601px) {
+      .container { padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Halaman Login -->
+    <div id="loginPage" class="card">
+      <h2>🔐 Masuk ke QR Scanner Pro</h2>
+      <input type="text" id="username" placeholder="Nama Pengguna" />
+      <input type="password" id="password" placeholder="Kata Sandi" />
+      <button onclick="login()">Masuk</button>
+      <div id="loginError" style="color: #dc3545; margin-top: 12px; display: none;">❌ Nama pengguna atau kata sandi salah</div>
+    </div>
+
+    <!-- Halaman Scanner -->
+    <div id="scannerPage">
+      <header>
+        <img src="LOGO.png" alt="Logo Perusahaan"
+     style="width: 10%; height:10%; transform:rotate(90deg); transform-origin:center;">
+           HYDRAXLE PERKASA
+      </header>
+      <div class="video-container">
+        <video id="video" autoplay playsinline></video>
+        <div class="scan-area"></div>
+      </div>
+      <div id="status">Arahkan kamera ke kode QR...</div>
+      <div id="dashboard">
+        <h3>📋 Riwayat Pindai</h3>
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>Kode QR</th>
+              <th>Waktu Masuk</th>
+              <th>Waktu Selesai</th>
+              <th>Bagian</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button class="logout-btn" onclick="logout()">Keluar</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="canvas" hidden></canvas>
+
+  <!-- jsQR -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+  <script>
+  // ==========================
+  // Data Akun Login
+  // ==========================
+  const users = {
+    "subframe12": { password: "1234", bagian: "SUBFRAME" },
+    "PTO34": { password: "1234", bagian: "PTO" },
+    "POTONGCHASIS56": { password: "1234", bagian: "POTONG CHASIS" }
+  };
+
+  let currentUser = null;
+
+  function login() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value.trim();
+
+    if (users[username] && users[username].password === password) {
+      currentUser = { username, bagian: users[username].bagian };
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("scannerPage").style.display = "flex";
+      startScanner();
+    } else {
+      document.getElementById("loginError").style.display = "block";
+    }
+  }
+
+  function logout() {
+    document.getElementById("scannerPage").style.display = "none";
+    document.getElementById("loginPage").style.display = "block";
+    document.getElementById("username").value = "";
+    document.getElementById("password").value = "";
+    document.getElementById("loginError").style.display = "none";
+    currentUser = null;
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+    }
+  }
+
+  // ==========================
+  // QR Scanner
+  // ==========================
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const statusEl = document.getElementById('status');
+  const tableBody = document.querySelector("#dataTable tbody");
+
+  let scanning = false;
+  const SCAN_DELAY = 30000;
+  const scanHistory = {};
+
+  function startScanner() {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then((stream) => {
+        video.srcObject = stream;
+        video.setAttribute("playsinline", true);
+        video.play();
+        scanning = true;
+        scanLoop();
+      })
+      .catch(() => {
+        statusEl.innerText = "❌ Kamera tidak dapat diakses";
+      });
+  }
+
+  function scanLoop() {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (code) {
+        handleScan(code.data);
+        scanning = false;
+        setTimeout(() => {
+          scanning = true;
+          scanLoop();
+        }, 1000);
+      }
+    }
+    requestAnimationFrame(scanLoop);
+  }
+
+  // ==========================
+  // Handle Data Scan
+  // ==========================
+  function handleScan(qrCode) {
+    const now = new Date();
+    const waktu = now.toLocaleString();
+
+    if (!scanHistory[qrCode]) {
+      const row = document.createElement("tr");
+      const cellCode = document.createElement("td");
+      const cellMasuk = document.createElement("td");
+      const cellSelesai = document.createElement("td");
+      const cellBagian = document.createElement("td");
+
+      cellCode.textContent = qrCode;
+      cellMasuk.textContent = waktu;
+      cellSelesai.textContent = "-";
+      cellBagian.textContent = currentUser.bagian;
+
+      row.appendChild(cellCode);
+      row.appendChild(cellMasuk);
+      row.appendChild(cellSelesai);
+      row.appendChild(cellBagian);
+
+      tableBody.prepend(row);
+
+      scanHistory[qrCode] = { lastScan: now, row: row };
+
+      statusEl.innerText = "✅ QR baru: " + qrCode;
+    } else {
+      const lastScanTime = scanHistory[qrCode].lastScan;
+      const diff = now - lastScanTime;
+
+      if (diff >= SCAN_DELAY) {
+        const row = scanHistory[qrCode].row;
+        const cellSelesai = row.cells[2];
+        cellSelesai.textContent = waktu;
+        scanHistory[qrCode].lastScan = now;
+
+        statusEl.innerText = "✅ QR selesai: " + qrCode;
+      } else {
+        statusEl.innerText = "⏳ QR sama terdeteksi, tunggu 1 menit untuk scan berikutnya";
+      }
+    }
+  }
+  </script>
+</body>
+</html>
